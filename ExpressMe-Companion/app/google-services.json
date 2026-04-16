@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "88564725085",
+    "project_id": "expressme-6b363",
+    "storage_bucket": "expressme-6b363.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88564725085:android:07482cdfb66629bc9564b4",
+        "android_client_info": {
+          "package_name": "com.expressme.companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUv9EgHfw-YkVwgqLZxPnuMSE4iHAtB9c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88564725085:android:ed5b5d1df74693149564b4",
+        "android_client_info": {
+          "package_name": "com.expressme.watch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUv9EgHfw-YkVwgqLZxPnuMSE4iHAtB9c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
