@@ -1,15 +1,22 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+# Mantendo seus arquivos, mas ajustando para subpastas
+**/*.iml
+**/.gradle/
+**/local.properties
+
+# Ignora a pasta .idea inteira em qualquer nível (isso engloba caches, libraries, etc)
+**/.idea/
+
+# Itens específicos que você já tinha (agora globais)
+**/.idea/caches/
+**/.idea/libraries/
+**/.idea/modules.xml
+**/.idea/workspace.xml
+**/.idea/navEditor.xml
+**/.idea/assetWizardSettings.xml
+
+# Sistema e Build
+**/.DS_Store
+**/build/
+**/captures/
+**/.externalNativeBuild/
+**/.cxx/
