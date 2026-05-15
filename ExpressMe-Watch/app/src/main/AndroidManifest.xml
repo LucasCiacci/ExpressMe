@@ -32,7 +32,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <!-- Serviço Firebase Cloud Messaging -->
         <service
             android:name=".service.WatchMessagingService"

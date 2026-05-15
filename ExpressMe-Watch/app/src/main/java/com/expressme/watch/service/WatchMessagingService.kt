@@ -1,11 +1,13 @@
 package com.expressme.watch.service
 
+import android.content.Context
 import android.util.Log
+import com.expressme.watch.R
+import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.OutputStreamWriter
@@ -18,45 +20,44 @@ import java.util.Locale
 /**
  * Serviço Firebase Cloud Messaging para o ExpressMe Watch.
  *
- * Responsável por:
- * 1. Receber mensagens push (caso necessário no futuro)
- * 2. Enviar notificações ao cuidador via POST HTTP para o FCM
- *
- * IMPORTANTE: Para produção, substitua FCM_SERVER_KEY pela chave
- * de servidor real do seu projeto Firebase, ou migre para um backend seguro.
+ * Agora utiliza a API V1 do Firebase Cloud Messaging e gera
+ * automaticamente o token OAuth2 usando a chave de serviço local.
  */
 class WatchMessagingService : FirebaseMessagingService() {
-
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         private const val TAG = "WatchMessagingService"
 
-        // URL da API legada do FCM para envio de mensagens
-        private const val FCM_URL = "https://fcm.googleapis.com/fcm/send"
+        // O ID do seu projeto Firebase (extraído do seu JSON)
+        private const val PROJECT_ID = "expressme-6b363"
+        
+        // URL da API V1 do FCM
+        private const val FCM_URL = "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send"
 
-        // TODO: Substituir pela chave de servidor real do Firebase Console
-        // Firebase Console > Projeto > Configurações > Cloud Messaging > Server key
-        private const val FCM_SERVER_KEY = "SUA_CHAVE_DE_SERVIDOR_AQUI"
-
-        // Nome da criança (fixo por enquanto, pode ser configurável futuramente)
+        // Nome da criança
         private const val NOME_CRIANCA = "A criança"
 
         /**
-         * Envia uma mensagem FCM para o tópico "cuidador" informando
-         * a emoção da criança.
-         *
-         * @param emocao Nome da emoção (feliz, ajuda, desconfortavel, sair)
-         * @param mensagem Descrição da mensagem (ex: "está feliz")
-         * @param corHex Cor hexadecimal do botão (ex: "#4CAF50")
+         * Gera o token OAuth2 e envia a mensagem para a API V1 do Firebase.
          */
-        fun sendEmotionMessage(emocao: String, mensagem: String, corHex: String) {
+        fun sendEmotionMessage(context: Context, emocao: String, mensagem: String, corHex: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val horario = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                    // 1. LER A CHAVE E GERAR O TOKEN (OAuth2)
+                    // Pega o arquivo res/raw/chave_firebase.json
+                    val inputStream = context.resources.openRawResource(R.raw.chave_firebase)
+                    val credentials = GoogleCredentials.fromStream(inputStream)
+                        .createScoped(listOf("https://www.googleapis.com/auth/firebase.messaging"))
+                    
+                    credentials.refreshIfExpired()
+                    val token = credentials.accessToken.tokenValue
 
-                    val jsonBody = JSONObject().apply {
-                        put("to", "/topics/cuidador")
+                    // 2. MONTAR O PAYLOAD
+                    val horario = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                    
+                    // O formato da API V1 exige o encapsulamento dentro de "message"
+                    val messageJson = JSONObject().apply {
+                        put("topic", "cuidador")
                         put("data", JSONObject().apply {
                             put("emocao", emocao)
                             put("mensagem", "$NOME_CRIANCA $mensagem")
@@ -65,32 +66,38 @@ class WatchMessagingService : FirebaseMessagingService() {
                         })
                     }
 
+                    val rootJson = JSONObject().apply {
+                        put("message", messageJson)
+                    }
+
+                    // 3. FAZER A REQUISIÇÃO (POST)
                     val url = URL(FCM_URL)
                     val connection = url.openConnection() as HttpURLConnection
                     connection.apply {
                         requestMethod = "POST"
                         setRequestProperty("Content-Type", "application/json")
-                        setRequestProperty("Authorization", "key=$FCM_SERVER_KEY")
+                        setRequestProperty("Authorization", "Bearer $token")
                         doOutput = true
-                        connectTimeout = 10000
-                        readTimeout = 10000
+                        connectTimeout = 15000
+                        readTimeout = 15000
                     }
 
                     OutputStreamWriter(connection.outputStream).use { writer ->
-                        writer.write(jsonBody.toString())
+                        writer.write(rootJson.toString())
                         writer.flush()
                     }
 
                     val responseCode = connection.responseCode
                     if (responseCode == HttpURLConnection.HTTP_OK) {
-                        Log.d(TAG, "Mensagem FCM enviada com sucesso: $emocao")
+                        Log.d(TAG, "Mensagem FCM V1 enviada com sucesso: \$emocao")
                     } else {
-                        Log.e(TAG, "Erro ao enviar FCM. Código: $responseCode")
+                        val errorStream = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                        Log.e(TAG, "Erro ao enviar FCM V1. Código: \$responseCode - Detalhe: \$errorStream")
                     }
 
                     connection.disconnect()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Falha ao enviar mensagem FCM", e)
+                    Log.e(TAG, "Falha ao enviar mensagem FCM V1", e)
                 }
             }
         }
@@ -98,11 +105,11 @@ class WatchMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        Log.d(TAG, "Mensagem recebida: ${message.data}")
+        Log.d(TAG, "Mensagem recebida do FCM: \${message.data}")
     }
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "Novo token FCM: $token")
+        Log.d(TAG, "Novo token FCM do relógio: \$token")
     }
 }

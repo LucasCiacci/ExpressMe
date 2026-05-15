@@ -5,32 +5,43 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.expressme.companion.data.AlertaEntity
 import com.expressme.companion.data.AppDatabase
-import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.WearableListenerService
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-class NotificacaoService : WearableListenerService() {
+class NotificacaoService : FirebaseMessagingService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var database: AppDatabase
 
     companion object {
+        private const val TAG = "NotificacaoService"
         const val CHANNEL_ID = "expressme_alerts"
-        const val PATH_PREFIX = "/expressme_alerta"
-        val TIPOS_VALIDOS = setOf("desconfortavel", "sair", "ajuda", "feliz")
     }
 
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(this)
         createNotificationChannels()
+        
+        // Inscrever-se no tópico para receber as mensagens do relógio
+        FirebaseMessaging.getInstance().subscribeToTopic("cuidador")
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.d(TAG, "Inscrito no tópico 'cuidador' com sucesso.")
+                } else {
+                    Log.e(TAG, "Falha ao inscrever no tópico 'cuidador'.", task.exception)
+                }
+            }
     }
 
     override fun onDestroy() {
@@ -38,38 +49,32 @@ class NotificacaoService : WearableListenerService() {
         serviceScope.cancel()
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        if (!messageEvent.path.startsWith(PATH_PREFIX)) return
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Log.d(TAG, "Novo token FCM: $token")
+        FirebaseMessaging.getInstance().subscribeToTopic("cuidador")
+    }
 
-        val mensagem = String(messageEvent.data)
-        val tipo = extrairTipoDoPath(messageEvent.path) ?: inferirTipoPorTexto(mensagem)
+    override fun onMessageReceived(message: RemoteMessage) {
+        super.onMessageReceived(message)
+        
+        // As mensagens enviadas pelo relógio estão no bloco "data" do payload
+        val data = message.data
+        if (data.isEmpty()) return
+
+        val emocao = data["emocao"] ?: "outro"
+        val mensagem = data["mensagem"] ?: "A criança enviou um alerta"
+        val corHex = data["cor"] ?: "#808080"
 
         serviceScope.launch {
             val alerta = AlertaEntity(
                 mensagem = mensagem,
                 timestamp = System.currentTimeMillis(),
-                tipo = tipo,
+                tipo = emocao,
                 lido = false
             )
             database.alertaDao().insert(alerta)
-            showNotification(mensagem, tipo)
-        }
-    }
-
-    /** Extrai tipo do path estruturado: /expressme_alerta/ajuda -> "ajuda" */
-    private fun extrairTipoDoPath(path: String): String? {
-        val sufixo = path.removePrefix(PATH_PREFIX).trimStart('/')
-        return if (sufixo.isNotEmpty() && sufixo in TIPOS_VALIDOS) sufixo else null
-    }
-
-    /** Fallback por texto para compatibilidade com versão antiga do Watch */
-    private fun inferirTipoPorTexto(mensagem: String): String {
-        return when {
-            mensagem.contains("desconfortável", ignoreCase = true) -> "desconfortavel"
-            mensagem.contains("sair", ignoreCase = true)           -> "sair"
-            mensagem.contains("ajuda", ignoreCase = true)          -> "ajuda"
-            mensagem.contains("feliz", ignoreCase = true)          -> "feliz"
-            else                                                    -> "outro"
+            showNotification(mensagem, emocao)
         }
     }
 
@@ -80,7 +85,7 @@ class NotificacaoService : WearableListenerService() {
             CHANNEL_ID,
             "ExpressMe Alertas",
             NotificationManager.IMPORTANCE_DEFAULT
-        ).apply { description = "Alertas recebidos do smartwatch" }
+        ).apply { description = "Alertas recebidos do smartwatch via Internet" }
 
         val channelUrgente = NotificationChannel(
             "${CHANNEL_ID}_urgente",

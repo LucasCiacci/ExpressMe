@@ -203,8 +203,9 @@ fun EmotionQuadrant(
                 // 2. Reproduzir áudio correspondente
                 AudioHelper.play(context, emotion.name)
 
-                // 3. Enviar notificação FCM (fire-and-forget)
+                // 3. Enviar notificação FCM (fire-and-forget) pela internet
                 WatchMessagingService.sendEmotionMessage(
+                    context = context,
                     emocao = emotion.name,
                     mensagem = emotion.message,
                     corHex = emotion.colorHex
