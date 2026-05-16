@@ -69,5 +69,4 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("com.google.firebase:firebase-messaging")
-    implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
 }
